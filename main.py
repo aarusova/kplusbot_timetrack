@@ -558,7 +558,7 @@ async def post_init(application: Application):
     await application.bot.set_webhook(webhook_url)
     logger.info(f"✅ Webhook установлен на {webhook_url}")
 
-'''def main() -> None:
+def main() -> None:
     TOKEN = os.getenv('TELEGRAM_TOKEN')
     if not TOKEN:
         raise ValueError("Токен не найден!") 
@@ -598,23 +598,24 @@ async def post_init(application: Application):
 )
 
 # Регистрируем обработчики
-    application.add_handler(start_conv_handler)
-    application.add_handler(task_conv_handler)
     application.add_handler(TypeHandler(Update, handle_webhook_update))
-    application.add_error_handler(error_handler)
     application.add_handler(CommandHandler('taskend', end_task))
     application.add_handler(CommandHandler('reportweek', report_week))
     application.add_handler(CommandHandler('reportmonth', report_week))  # Временная заглушка
     application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_error_handler(error_handler)
+    application.add_handler(start_conv_handler)
+    application.add_handler(task_conv_handler)
 
     logger.info(f"🔧 Зарегистрировано обработчиков: {len(application.handlers)}")
 
     
-    logger.info("Бот запускается...")
     application.run_webhook(
-        listen="0.0.0.0",  # Слушаем все интерфейсы
-        port=10000,        # Стандартный порт для Render
+        listen="0.0.0.0",
+        port=10000,
         webhook_url=f"https://kplusbot-timetrack.onrender.com/{TOKEN}",
+        secret_token="YOUR_SECRET",
+        drop_pending_updates=True
     )
 '''
 def main():
@@ -635,6 +636,7 @@ def main():
         secret_token="YOUR_SECRET",
         drop_pending_updates=True
     )
+    '''
     
 if __name__ == '__main__':
     main()
