@@ -103,16 +103,14 @@ async def edit_message_without_reply_markup(update: Update, context: ContextType
     else:
         await update.message.reply_text(text)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
     await update.message.reply_text(
         "📊 Бот для учета рабочего времени\n\n"
         f"1. Создайте Google таблицу\n"
         f"2. Дайте доступ сервисному аккаунту: {SERVICE_ACCOUNT_EMAIL}\n"
-        f"3. Пришлите мне ссылку на таблицу или её ID\n\n"
-        "Пример ссылки: https://docs.google.com/spreadsheets/d/ABC123/edit"
+        f"3. Пришлите мне ссылку на таблицу или её ID"
     )
-    return START
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработчик отмены действий"""
@@ -563,10 +561,13 @@ def main() -> None:
 
     # Используем ApplicationBuilder для webhook
     application = (
-        ApplicationBuilder()
-        .token(TOKEN)
-        .post_init(post_init)
-        .build()
+    ApplicationBuilder()
+    .token(TOKEN)
+    .post_init(post_init)
+    .concurrent_updates(True)  # Важно для вебхуков
+    .http_version("1.1")       # Совместимость с Render
+    .get_updates_http_version("1.1")
+    .build()
     )
     
     
@@ -605,6 +606,7 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_error_handler(error_handler)
     application.add_handler(TypeHandler(Update, handle_webhook_update))
+    application.add_handler(CommandHandler("start", start))
 
     logger.info("Бот запускается...")
     application.run_webhook(
