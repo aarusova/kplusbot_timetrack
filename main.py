@@ -554,14 +554,9 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 async def post_init(application: Application):
     await application.bot.set_webhook(f"https://kplusbot-timetrack.onrender.com/{TOKEN}")
 
-app = Flask(__name__)
-
-@app.route('/health')
-def health_check():
-    return jsonify(status="OK")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(f"Получен /start от {update.effective_user.id}")  # Добавьте эту строку!
+    logger.info(f"Получен /start от {update.effective_user.id}")  
     await update.message.reply_text("Бот запущен!")
 
 def main() -> None:
