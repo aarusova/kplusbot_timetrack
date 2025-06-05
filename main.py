@@ -29,6 +29,11 @@ logger = logging.getLogger(__name__)
 # Константы для состояний разговора
 START, TASK_DESCRIPTION, TASK_TAGS = range(3)
 
+TOKEN = os.getenv('TELEGRAM_TOKEN')
+if not TOKEN:
+    raise ValueError("Токен не найден! Проверьте переменные окружения.")
+
+
 # Настройки Google Sheets
 SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
