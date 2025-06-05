@@ -18,7 +18,10 @@ from telegram.ext import (
 )
 import json
 from tempfile import NamedTemporaryFile
+from telegram.ext import base
 
+
+logger.info(f"Доступные классы обработчиков: {dir(base)}")
 
 # Настройка логирования
 logging.basicConfig(
@@ -618,24 +621,31 @@ async def post_init(application: Application):
     )
 '''
 def main() -> None:
-    TOKEN = os.getenv('TELEGRAM_TOKEN')
-    if not TOKEN:
-        raise ValueError("Токен не найден!") 
-    # Тестовая проверка
-    from telegram.ext import Handler
-    print("Тестовые обработчики:", [type(h) for h in application.handlers[0]])
-    
-    # Регистрация обработчиков ДО запуска вебхука
+    # Создаем приложение
+    application = (
+        ApplicationBuilder()
+        .token(TOKEN)
+        .post_init(post_init)
+        .concurrent_updates(True)
+        .build()
+    )
+
+    # Явная регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
     application.add_handler(TypeHandler(Update, handle_webhook_update))
     
-    # Явная проверка
-    logger.info(f"🛠 Всего обработчиков: {len(application.handlers)}")  # Должно быть 2
+    # Проверка количества обработчиков
+    logger.info(f"🛠 Зарегистрировано обработчиков: {len(application.handlers)}")
     
+    for handler in application.handlers[0]:
+        logger.info(f"🔹 Обработчик: {type(handler).__name__}")
+    
+    # Запуск вебхука
     application.run_webhook(
         listen="0.0.0.0",
         port=10000,
         webhook_url=f"https://kplusbot-timetrack.onrender.com/{TOKEN}",
+        drop_pending_updates=True
     )
 if __name__ == '__main__':
     main()
