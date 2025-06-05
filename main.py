@@ -20,9 +20,6 @@ from telegram.ext import (
 import json
 from tempfile import NamedTemporaryFile
 
-
-logger.info(f"Доступные классы обработчиков: {dir(base)}")
-
 # Настройка логирования
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
