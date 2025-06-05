@@ -104,14 +104,15 @@ async def edit_message_without_reply_markup(update: Update, context: ContextType
         await update.message.reply_text(text)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start"""
+    user = update.effective_user
+    logger.info(f"⚡ Команда /start от {user.id} ({user.full_name})")
+    
     await update.message.reply_text(
-        "📊 Бот для учета рабочего времени\n\n"
-        f"1. Создайте Google таблицу\n"
-        f"2. Дайте доступ сервисному аккаунту: {SERVICE_ACCOUNT_EMAIL}\n"
-        f"3. Пришлите мне ссылку на таблицу или её ID"
+        "🔄 Бот активирован!\n"
+        "Для работы с задачами используйте меню:",
+        reply_markup=get_main_keyboard()
     )
-
+    
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработчик отмены действий"""
     user_id = update.effective_user.id
@@ -613,6 +614,9 @@ def main() -> None:
     application.add_handler(TypeHandler(Update, handle_webhook_update))
     application.add_handler(CommandHandler("start", start))
 
+    logger.info(f"🔧 Зарегистрировано обработчиков: {len(application.handlers)}")
+
+    
     logger.info("Бот запускается...")
     application.run_webhook(
         listen="0.0.0.0",  # Слушаем все интерфейсы
