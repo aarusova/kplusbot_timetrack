@@ -620,21 +620,21 @@ async def post_init(application: Application):
 def main():
     application = ApplicationBuilder().token(TOKEN).build()
     
-    # Регистрация обработчиков
+    # 1. Обязательные обработчики (регистрируем ПЕРВЫМИ)
+    application.add_handler(TypeHandler(Update, handle_webhook_update))  # Самый первый!
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(TypeHandler(Update, handle_webhook_update))
     
-    # Проверка (новый метод)
-    logger.info(f"Зарегистрировано {len(application.handlers[0])} обработчиков:")
-    for handler in application.handlers[0]:
-        logger.info(f"- {handler.__class__.__name__}")
-
-    # Запуск вебхука
+    # 2. Проверка
+    logger.info(f"🛠 Всего обработчиков: {len(application.handlers[0])}")
+    
+    # 3. Запуск вебхука
     application.run_webhook(
         listen="0.0.0.0",
         port=10000,
         webhook_url=f"https://kplusbot-timetrack.onrender.com/{TOKEN}",
+        secret_token="YOUR_SECRET",
         drop_pending_updates=True
     )
+    
 if __name__ == '__main__':
     main()
