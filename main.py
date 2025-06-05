@@ -558,9 +558,6 @@ def main() -> None:
         .build()
     )
     
-    except Exception as e:
-        logger.error(f"Failed to start bot: {e}", exc_info=True)
-        raise
     
     # Обработчик старта и подключения таблицы
     start_conv_handler = ConversationHandler(
