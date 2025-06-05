@@ -18,6 +18,7 @@ from telegram.ext import (
 )
 import json
 from tempfile import NamedTemporaryFile
+from flask import Flask, jsonify
 
 
 # Настройка логирования
@@ -554,6 +555,16 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 async def post_init(application: Application):
     await application.bot.set_webhook(f"https://kplusbot-timetrack.onrender.com/{TOKEN}")
 
+app = Flask(__name__)
+
+@app.route('/health')
+def health_check():
+    return jsonify(status="OK")
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Получен /start от {update.effective_user.id}")  # Добавьте эту строку!
+    await update.message.reply_text("Бот запущен!")
+
 def main() -> None:
     TOKEN = os.getenv('TELEGRAM_TOKEN')
     if not TOKEN:
@@ -613,6 +624,8 @@ def main() -> None:
         listen="0.0.0.0",  # Слушаем все интерфейсы
         port=10000,        # Стандартный порт для Render
         webhook_url=f"https://kplusbot-timetrack.onrender.com/{TOKEN}",
+        app.run(host='0.0.0.0', port=10000)
+
     )
 
 if __name__ == '__main__':
