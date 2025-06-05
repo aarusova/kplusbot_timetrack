@@ -606,7 +606,7 @@ def main() -> None:
         ]
     },
     fallbacks=[CommandHandler('cancel', cancel)]
-)
+    )
     
     # Регистрируем обработчики
     application.add_handler(start_conv_handler)
@@ -624,8 +624,6 @@ def main() -> None:
         listen="0.0.0.0",  # Слушаем все интерфейсы
         port=10000,        # Стандартный порт для Render
         webhook_url=f"https://kplusbot-timetrack.onrender.com/{TOKEN}",
-        app.run(host='0.0.0.0', port=10000)
-
     )
 
 if __name__ == '__main__':
