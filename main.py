@@ -553,29 +553,14 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             )
 
 async def post_init(application: Application):
-    await application.bot.set_webhook(f"https://kplusbot-timetrack.onrender.com/{TOKEN}")
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(f"Получен /start от {update.effective_user.id}")  
-    await update.message.reply_text("Бот запущен!")
+    webhook_url = f"https://kplusbot-timetrack.onrender.com/{TOKEN}"
+    await application.bot.set_webhook(webhook_url)
+    logger.info(f"✅ Webhook установлен на {webhook_url}")
 
 def main() -> None:
     TOKEN = os.getenv('TELEGRAM_TOKEN')
     if not TOKEN:
-        raise ValueError("Токен не найден!")
-
-    # Используем ApplicationBuilder для webhook
-    application = (
-    ApplicationBuilder()
-    .token(TOKEN)
-    .post_init(post_init)
-    .concurrent_updates(True)  # Важно для вебхуков
-    .http_version("1.1")       # Совместимость с Render
-    .get_updates_http_version("1.1")
-    .build()
-    )
-    
+        raise ValueError("Токен не найден!") 
     
     # Обработчик старта и подключения таблицы
     start_conv_handler = ConversationHandler(
@@ -602,17 +587,24 @@ def main() -> None:
     },
     fallbacks=[CommandHandler('cancel', cancel)]
     )
-    
-    # Регистрируем обработчики
-    application.add_handler(CommandHandler("start", start))
+    application = (
+    ApplicationBuilder()
+    .token(TOKEN)
+    .post_init(post_init)
+    .concurrent_updates(True)
+    .http_version("1.1")
+    .build()
+)
+
+# Регистрируем обработчики
     application.add_handler(start_conv_handler)
     application.add_handler(task_conv_handler)
+    application.add_handler(TypeHandler(Update, handle_webhook_update))
+    application.add_error_handler(error_handler)
     application.add_handler(CommandHandler('taskend', end_task))
     application.add_handler(CommandHandler('reportweek', report_week))
     application.add_handler(CommandHandler('reportmonth', report_week))  # Временная заглушка
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_error_handler(error_handler)
-    application.add_handler(TypeHandler(Update, handle_webhook_update))
 
     logger.info(f"🔧 Зарегистрировано обработчиков: {len(application.handlers)}")
 
