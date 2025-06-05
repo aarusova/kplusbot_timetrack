@@ -19,7 +19,6 @@ from telegram.ext import (
 import json
 from tempfile import NamedTemporaryFile
 
-application = ApplicationBuilder().token(TOKEN).build()
 
 # Настройка логирования
 logging.basicConfig(
@@ -34,6 +33,8 @@ START, TASK_DESCRIPTION, TASK_TAGS = range(3)
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 if not TOKEN:
     raise ValueError("Токен не найден! Проверьте переменные окружения.")
+
+application = ApplicationBuilder().token(TOKEN).build()
 
 
 # Настройки Google Sheets
@@ -617,6 +618,9 @@ async def post_init(application: Application):
     )
 '''
 def main() -> None:
+    TOKEN = os.getenv('TELEGRAM_TOKEN')
+    if not TOKEN:
+        raise ValueError("Токен не найден!") 
     # Тестовая проверка
     from telegram.ext import Handler
     print("Тестовые обработчики:", [type(h) for h in application.handlers[0]])
