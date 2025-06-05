@@ -19,6 +19,7 @@ from telegram.ext import (
 import json
 from tempfile import NamedTemporaryFile
 
+application = ApplicationBuilder().token(TOKEN).build()
 
 # Настройка логирования
 logging.basicConfig(
@@ -66,7 +67,6 @@ user_sheets = {}  # {user_id: {'url': str, 'id': str}}
 user_tasks = {}   # {user_id: {'start_time': datetime, 'description': str, 'tags': str}}
 
 async def handle_webhook_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик входящих обновлений через вебхук"""
     await application.process_update(update)
 
 def extract_spreadsheet_id(url):
@@ -557,7 +557,7 @@ async def post_init(application: Application):
     await application.bot.set_webhook(webhook_url)
     logger.info(f"✅ Webhook установлен на {webhook_url}")
 
-def main() -> None:
+'''def main() -> None:
     TOKEN = os.getenv('TELEGRAM_TOKEN')
     if not TOKEN:
         raise ValueError("Токен не найден!") 
@@ -615,6 +615,23 @@ def main() -> None:
         port=10000,        # Стандартный порт для Render
         webhook_url=f"https://kplusbot-timetrack.onrender.com/{TOKEN}",
     )
-
+'''
+def main() -> None:
+    # Тестовая проверка
+    from telegram.ext import Handler
+    print("Тестовые обработчики:", [type(h) for h in application.handlers[0]])
+    
+    # Регистрация обработчиков ДО запуска вебхука
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(TypeHandler(Update, handle_webhook_update))
+    
+    # Явная проверка
+    logger.info(f"🛠 Всего обработчиков: {len(application.handlers)}")  # Должно быть 2
+    
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=10000,
+        webhook_url=f"https://kplusbot-timetrack.onrender.com/{TOKEN}",
+    )
 if __name__ == '__main__':
     main()
