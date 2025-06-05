@@ -16,7 +16,6 @@ from telegram.ext import (
     TypeHandler,
     filters
 )
-
 import json
 from tempfile import NamedTemporaryFile
 
@@ -69,6 +68,17 @@ user_tasks = {}   # {user_id: {'start_time': datetime, 'description': str, 'tags
 
 async def handle_webhook_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await application.process_update(update)
+
+async def start_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()  # Обязательно для callback-кнопок
+    logger.info(f"Получен callback: {query.data} от {query.from_user.id}")
+
+    # Редактируем сообщение с кнопкой
+    await query.edit_message_text(
+        text="🚀 Бот запущен! Выберите действие:",
+        reply_markup=get_main_keyboard()  # Ваша клавиатура с кнопками
+    )
 
 def extract_spreadsheet_id(url):
     """Извлекает ID таблицы из различных форматов URL"""
@@ -599,7 +609,7 @@ def main() -> None:
 
 # Регистрируем обработчики
     application.add_handler(TypeHandler(Update, handle_webhook_update))
-    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(start_button, pattern='^start$'))
 
     application.add_handler(CommandHandler('taskend', end_task))
     application.add_handler(CommandHandler('reportweek', report_week))
