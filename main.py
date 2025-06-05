@@ -14,6 +14,9 @@ from telegram.ext import (
     ConversationHandler,
     filters
 )
+import json
+from tempfile import NamedTemporaryFile
+
 
 # Настройка логирования
 logging.basicConfig(
@@ -30,24 +33,27 @@ SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/drive'
 ]
-CREDS_FILE = 'credentials.json'
 
 initialized_sheets = {}
 
 # Проверка наличия файла с учетными данными
-if not os.path.exists(CREDS_FILE):
-    raise FileNotFoundError(f"Файл {CREDS_FILE} не найден. Создайте сервисный аккаунт в Google Cloud Console.")
+def get_google_creds():
+    creds_json = os.getenv('GOOGLE_CREDS_JSON')
+    if not creds_json:
+        raise ValueError("GOOGLE_CREDS_JSON не найден в переменных окружения!")
+    
+    try:
+        # Создаем временный файл
+        with NamedTemporaryFile(mode='w+', suffix='.json') as temp:
+            temp.write(creds_json)
+            temp.flush()
+            creds = ServiceAccountCredentials.from_json_keyfile_name(temp.name, SCOPES)
+        return creds
+    except Exception as e:
+        raise ValueError(f"Ошибка загрузки Google creds: {str(e)}")
 
-# Инициализация Google Sheets API
-try:
-    creds = ServiceAccountCredentials.from_json_keyfile_name(CREDS_FILE, SCOPES)
-    client = gspread.authorize(creds)
-    SERVICE_ACCOUNT_EMAIL = creds.service_account_email
-    logger.info(f"Успешная авторизация Google API. Сервисный аккаунт: {SERVICE_ACCOUNT_EMAIL}")
-except Exception as e:
-    logger.error(f"Ошибка инициализации Google API: {e}")
-    raise
-
+creds = get_google_creds()
+client = gspread.authorize(creds)
 # Глобальные переменные для хранения состояния
 user_sheets = {}  # {user_id: {'url': str, 'id': str}}
 user_tasks = {}   # {user_id: {'start_time': datetime, 'description': str, 'tags': str}}
