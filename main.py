@@ -603,7 +603,7 @@ def main() -> None:
     application.run_webhook(
         listen="0.0.0.0",  # Слушаем все интерфейсы
         port=10000,        # Стандартный порт для Render
-        webhook_url=f"https://your-render-url.onrender.com/{TOKEN}",
+        webhook_url=f"https://kplusbot-timetrack.onrender.com/{TOKEN}",
     )
 
 if __name__ == '__main__':
