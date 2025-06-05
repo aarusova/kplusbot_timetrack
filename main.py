@@ -546,10 +546,9 @@ async def post_init(application: Application):
     await application.bot.set_webhook(f"https://kplusbot-timetrack.onrender.com/{TOKEN}")
 
 def main() -> None:
-    try:
-        TOKEN = os.getenv('TELEGRAM_TOKEN')
-        if not TOKEN:
-            raise ValueError("Токен не найден!")
+    TOKEN = os.getenv('TELEGRAM_TOKEN')
+    if not TOKEN:
+        raise ValueError("Токен не найден!")
 
     # Используем ApplicationBuilder для webhook
     application = (
