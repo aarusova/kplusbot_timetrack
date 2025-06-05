@@ -551,8 +551,11 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main() -> None:
     """Запуск бота"""
-    # Замените 'YOUR_BOT_TOKEN' на реальный токен вашего бота
-    application = Application.builder().token("token").build()
+    TOKEN = os.getenv('TELEGRAM_TOKEN')  # Загружаем из переменной окружения
+    if not TOKEN:
+        raise ValueError("Токен не найден! Проверьте переменные окружения.")
+
+application = Application.builder().token(TOKEN).build()
     
     # Обработчик старта и подключения таблицы
     start_conv_handler = ConversationHandler(
