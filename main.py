@@ -33,7 +33,6 @@ SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/drive'
 ]
-SERVICE_ACCOUNT_EMAIL = creds.service_account_email
 
 initialized_sheets = {}
 
@@ -44,16 +43,15 @@ def get_google_creds():
         raise ValueError("GOOGLE_CREDS_JSON не найден в переменных окружения!")
     
     try:
-        # Создаем временный файл
-        with NamedTemporaryFile(mode='w+', suffix='.json') as temp:
-            temp.write(creds_json)
-            temp.flush()
-            creds = ServiceAccountCredentials.from_json_keyfile_name(temp.name, SCOPES)
-        return creds
+        creds_dict = json.loads(creds_json)
+        return ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPES)
+    except json.JSONDecodeError:
+        raise ValueError("GOOGLE_CREDS_JSON содержит невалидный JSON")
     except Exception as e:
         raise ValueError(f"Ошибка загрузки Google creds: {str(e)}")
 
 creds = get_google_creds()
+SERVICE_ACCOUNT_EMAIL = creds.service_account_email
 client = gspread.authorize(creds)
 # Глобальные переменные для хранения состояния
 user_sheets = {}  # {user_id: {'url': str, 'id': str}}
@@ -542,14 +540,17 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             await update.message.reply_text(
                 "⚠️ Произошла ошибка. Напиши Насте."
             )
-
 def main() -> None:
-    """Запуск бота"""
-    TOKEN = os.getenv('TELEGRAM_TOKEN')  # Загружаем из переменной окружения
-    if not TOKEN:
-        raise ValueError("Токен не найден! Проверьте переменные окружения.")
+    try:
+        TOKEN = os.getenv('TELEGRAM_TOKEN')
+        if not TOKEN:
+            raise ValueError("Токен не найден! Проверьте переменные окружения.")
 
-    application = Application.builder().token(TOKEN).build()
+        application = Application.builder().token(TOKEN).build()
+        # остальной код
+    except Exception as e:
+        logger.error(f"Failed to start bot: {e}", exc_info=True)
+        raise
     
     # Обработчик старта и подключения таблицы
     start_conv_handler = ConversationHandler(
