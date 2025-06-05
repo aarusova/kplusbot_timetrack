@@ -13,7 +13,8 @@ from telegram.ext import (
     ContextTypes,
     ConversationHandler,
     filters,
-    ApplicationBuilder
+    ApplicationBuilder,
+    TypeHandler
 )
 import json
 from tempfile import NamedTemporaryFile
@@ -59,9 +60,14 @@ def get_google_creds():
 creds = get_google_creds()
 SERVICE_ACCOUNT_EMAIL = creds.service_account_email
 client = gspread.authorize(creds)
+
 # Глобальные переменные для хранения состояния
 user_sheets = {}  # {user_id: {'url': str, 'id': str}}
 user_tasks = {}   # {user_id: {'start_time': datetime, 'description': str, 'tags': str}}
+
+async def handle_webhook_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик входящих обновлений через вебхук"""
+    await application.process_update(update)
 
 def extract_spreadsheet_id(url):
     """Извлекает ID таблицы из различных форматов URL"""
@@ -598,7 +604,8 @@ def main() -> None:
     application.add_handler(CommandHandler('reportmonth', report_week))  # Временная заглушка
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_error_handler(error_handler)
-    
+    application.add_handler(TypeHandler(Update, handle_webhook_update))
+
     logger.info("Бот запускается...")
     application.run_webhook(
         listen="0.0.0.0",  # Слушаем все интерфейсы
