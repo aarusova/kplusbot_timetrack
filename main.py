@@ -599,6 +599,8 @@ def main() -> None:
 
 # Регистрируем обработчики
     application.add_handler(TypeHandler(Update, handle_webhook_update))
+    application.add_handler(CommandHandler("start", start))
+
     application.add_handler(CommandHandler('taskend', end_task))
     application.add_handler(CommandHandler('reportweek', report_week))
     application.add_handler(CommandHandler('reportmonth', report_week))  # Временная заглушка
@@ -607,7 +609,7 @@ def main() -> None:
     application.add_handler(start_conv_handler)
     application.add_handler(task_conv_handler)
 
-    logger.info(f"🔧 Зарегистрировано обработчиков: {len(application.handlers)}")
+    logger.info(f"🛠 Всего обработчиков: {len(application.handlers[0])}")
 
     
     application.run_webhook(
