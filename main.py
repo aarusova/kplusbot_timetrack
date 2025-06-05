@@ -7,18 +7,18 @@ from oauth2client.service_account import ServiceAccountCredentials
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
+    ApplicationBuilder,
     CommandHandler,
+    ContextTypes,
     MessageHandler,
     CallbackQueryHandler,
-    ContextTypes,
     ConversationHandler,
-    filters,
-    ApplicationBuilder,
-    TypeHandler
+    TypeHandler,
+    filters
 )
+
 import json
 from tempfile import NamedTemporaryFile
-from telegram.ext import base
 
 
 logger.info(f"Доступные классы обработчиков: {dir(base)}")
@@ -620,26 +620,18 @@ async def post_init(application: Application):
         webhook_url=f"https://kplusbot-timetrack.onrender.com/{TOKEN}",
     )
 '''
-def main() -> None:
-    # Создаем приложение
-    application = (
-        ApplicationBuilder()
-        .token(TOKEN)
-        .post_init(post_init)
-        .concurrent_updates(True)
-        .build()
-    )
-
-    # Явная регистрация обработчиков
+def main():
+    application = ApplicationBuilder().token(TOKEN).build()
+    
+    # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
     application.add_handler(TypeHandler(Update, handle_webhook_update))
     
-    # Проверка количества обработчиков
-    logger.info(f"🛠 Зарегистрировано обработчиков: {len(application.handlers)}")
-    
+    # Проверка (новый метод)
+    logger.info(f"Зарегистрировано {len(application.handlers[0])} обработчиков:")
     for handler in application.handlers[0]:
-        logger.info(f"🔹 Обработчик: {type(handler).__name__}")
-    
+        logger.info(f"- {handler.__class__.__name__}")
+
     # Запуск вебхука
     application.run_webhook(
         listen="0.0.0.0",
