@@ -618,7 +618,7 @@ async def post_init(application: Application):
     )
 '''
 def main():
-    application = ApplicationBuilder().token(TOKEN).build()
+    application = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
     
     # 1. Обязательные обработчики (регистрируем ПЕРВЫМИ)
     application.add_handler(TypeHandler(Update, handle_webhook_update))  # Самый первый!
