@@ -18,7 +18,6 @@ from telegram.ext import (
 )
 import json
 from tempfile import NamedTemporaryFile
-from flask import Flask, jsonify
 
 
 # Настройка логирования
