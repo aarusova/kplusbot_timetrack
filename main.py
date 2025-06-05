@@ -12,7 +12,8 @@ from telegram.ext import (
     CallbackQueryHandler,
     ContextTypes,
     ConversationHandler,
-    filters
+    filters,
+    ApplicationBuilder
 )
 import json
 from tempfile import NamedTemporaryFile
@@ -540,14 +541,24 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             await update.message.reply_text(
                 "⚠️ Произошла ошибка. Напиши Насте."
             )
+
+async def post_init(application: Application):
+    await application.bot.set_webhook(f"https://kplusbot-timetrack.onrender.com/{TOKEN}")
+
 def main() -> None:
     try:
         TOKEN = os.getenv('TELEGRAM_TOKEN')
         if not TOKEN:
-            raise ValueError("Токен не найден! Проверьте переменные окружения.")
+            raise ValueError("Токен не найден!")
 
-        application = Application.builder().token(TOKEN).build()
-        # остальной код
+    # Используем ApplicationBuilder для webhook
+    application = (
+        ApplicationBuilder()
+        .token(TOKEN)
+        .post_init(post_init)
+        .build()
+    )
+    
     except Exception as e:
         logger.error(f"Failed to start bot: {e}", exc_info=True)
         raise
@@ -588,7 +599,11 @@ def main() -> None:
     application.add_error_handler(error_handler)
     
     logger.info("Бот запускается...")
-    application.run_polling()
+    application.run_webhook(
+        listen="0.0.0.0",  # Слушаем все интерфейсы
+        port=10000,        # Стандартный порт для Render
+        webhook_url=f"https://your-render-url.onrender.com/{TOKEN}",
+    )
 
 if __name__ == '__main__':
     main()
