@@ -561,7 +561,7 @@ def main() -> None:
     if not TOKEN:
         raise ValueError("Токен не найден! Проверьте переменные окружения.")
 
-application = Application.builder().token(TOKEN).build()
+    application = Application.builder().token(TOKEN).build()
     
     # Обработчик старта и подключения таблицы
     start_conv_handler = ConversationHandler(
@@ -587,7 +587,7 @@ application = Application.builder().token(TOKEN).build()
         ]
     },
     fallbacks=[CommandHandler('cancel', cancel)]
-)
+    )
     
     # Регистрируем обработчики
     application.add_handler(start_conv_handler)
