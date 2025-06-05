@@ -33,6 +33,7 @@ SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/drive'
 ]
+SERVICE_ACCOUNT_EMAIL = creds.service_account_email
 
 initialized_sheets = {}
 
@@ -531,20 +532,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         await report_week(update, context)
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработчик нажатий на кнопки"""
-    query = update.callback_query
-    await query.answer()
-    
-    if query.data == 'task_start':
-        await task_start(update, context)
-    elif query.data == 'task_end':
-        # Просто передаем управление в task_end без редактирования сообщения
-        await task_end(update, context)
-    elif query.data == 'report_week':
-        await report_week(update, context)
-    elif query.data == 'report_month':
-        await report_week(update, context)  # Временная заглушка
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Глобальный обработчик ошибок"""
     logger.error("Ошибка в обработчике:", exc_info=context.error)
@@ -587,7 +575,7 @@ def main() -> None:
         ]
     },
     fallbacks=[CommandHandler('cancel', cancel)]
-    )
+)
     
     # Регистрируем обработчики
     application.add_handler(start_conv_handler)
