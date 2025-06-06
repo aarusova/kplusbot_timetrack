@@ -17,12 +17,7 @@ from telegram.ext import (
 import json
 from tempfile import NamedTemporaryFile
 
-from flask import Flask
-app = Flask(__name__)
 
-@app.route('/ping')
-def ping():
-    return "OK", 200
     
 # Настройка логирования
 logging.basicConfig(
