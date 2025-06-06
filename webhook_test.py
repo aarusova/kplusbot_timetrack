@@ -18,6 +18,7 @@ from telegram.ext import (
 import json
 from tempfile import NamedTemporaryFile
 from telegram.error import Conflict
+from aiohttp import web
 
 # Настройка логирования
 logging.basicConfig(
@@ -556,18 +557,38 @@ async def terminate_previous_sessions(token: str):
     except Exception as e:
         logger.warning(f"Ошибка при закрытии сессий: {e}")
         
-async def main_async():
-    """Основная асинхронная функция запуска бота"""
+async def webserver():
+    app = web.Application()
+    app.router.add_get("/ping", lambda r: web.Response(text="pong"))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", int(os.getenv("PORT", 8080)))
+    await site.start()
+    logger.info("Веб-сервер для пинга запущен")
+
+# Пинг бота каждые 2 минуты
+async def keep_alive(context: CallbackContext):
+    await context.bot.get_me()
+    logger.info("Keep-alive ping отправлен")
+
+# Обработчик команды /start
+async def start(update: Update, context: CallbackContext):
+    await update.message.reply_text("Бот активен!")
+
+async def main():
     try:
         TOKEN = os.getenv('TELEGRAM_TOKEN')
         if not TOKEN:
             raise ValueError("Токен не найден!")
 
-        await terminate_previous_sessions(TOKEN)
-        
+        # Запускаем веб-сервер в фоне
+        asyncio.create_task(webserver())
+
+        # Инициализация бота
         application = Application.builder().token(TOKEN).build()
         
-    # Обработчик старта и подключения таблицы
+        # Добавляем обработчики
+# Обработчик старта и подключения таблицы
         start_conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', start)],
             states={
@@ -602,25 +623,17 @@ async def main_async():
         application.add_handler(CallbackQueryHandler(button_handler))
         application.add_error_handler(error_handler)
         
-        logger.info("Бот запускается...")
-        await application.run_polling(
-            drop_pending_updates=True,
-            close_loop=False
-        )
-    except Conflict as e:
-        logger.error(f"Конфликт: {e}. Возможно, уже запущен другой экземпляр бота.")
+        # Пинг каждые 2 минуты
+        application.job_queue.run_repeating(keep_alive, interval=120)
+
+        # Запуск
+        logger.info("Бот запущен с keep-alive пингами")
+        await application.run_polling()
+
     except Exception as e:
-        logger.error(f"Ошибка при запуске бота: {e}", exc_info=True)
-
-
-def main() -> None:
-    try:
-        asyncio.run(main_async())
-    except KeyboardInterrupt:
-        logger.info("Бот остановлен пользователем")
-    except Exception as e:
-        logger.error(f"Критическая ошибка: {e}", exc_info=True)
-
+        logger.error(f"ОШИБКА: {str(e)}")
+        raise        
+            
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
