@@ -567,15 +567,24 @@ def run_health_server(port=10000):
     logger.info(f"Health check server running on port {port}")
     server.serve_forever()
 
-async def polling_task(application):
-    """Задача для running polling с обработкой ошибок"""
-    while True:
-        try:
-            logger.info("Starting polling...")
-            await application.run_polling()
-        except Exception as e:
-            logger.error(f"Polling error: {e}. Reconnecting in 10 seconds...")
-            await asyncio.sleep(10)
+async def run_polling(application):
+    """Запуск polling с обработкой ошибок"""
+    try:
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling()
+        
+        while True:
+            await asyncio.sleep(3600)  # Просто ждем
+            
+    except asyncio.CancelledError:
+        logger.info("Polling task cancelled")
+    except Exception as e:
+        logger.error(f"Polling error: {e}")
+    finally:
+        await application.updater.stop()
+        await application.stop()
+        await application.shutdown()
 
 async def wakeup_ping(port=10000):
     """Периодический самопинг для предотвращения сна"""
@@ -613,23 +622,31 @@ async def main_async():
         health_thread.start()
 
         # Создаем и запускаем задачи
-        tasks = [
-            asyncio.create_task(polling_task(application)),
-            asyncio.create_task(wakeup_ping(PORT))
-        ]
+        polling_task = asyncio.create_task(run_polling(application))
+        ping_task = asyncio.create_task(wakeup_ping(PORT))
 
         try:
-            await asyncio.gather(*tasks)
+            await asyncio.gather(polling_task, ping_task)
         except asyncio.CancelledError:
             logger.info("Application shutdown requested")
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
         finally:
-            logger.info("Cleaning up...")
+            if not polling_task.done():
+                polling_task.cancel()
+            if not ping_task.done():
+                ping_task.cancel()
+            
+            await asyncio.gather(
+                polling_task,
+                ping_task,
+                return_exceptions=True
+            )
+            
+            logger.info("Clean shutdown completed")
     else:
         logger.info("Running in standard polling mode")
         await application.run_polling()
-
 
 
 
