@@ -43,7 +43,7 @@ def get_google_creds():
         raise ValueError("GOOGLE_CREDS_JSON не найден в переменных окружения!")
 
     try:
-         creds_dict = json.loads(creds_json)
+        creds_dict = json.loads(creds_json)
         return ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPES)
     except json.JSONDecodeError:
         raise ValueError("GOOGLE_CREDS_JSON содержит невалидный JSON")
