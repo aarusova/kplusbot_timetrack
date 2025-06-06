@@ -1,6 +1,7 @@
 import os
 import re
 import logging
+import asyncio
 from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -547,70 +548,71 @@ async def terminate_previous_sessions():
         await bot.close()  # Закрываем предыдущие соединения
     except Exception as e:
         logger.warning(f"Ошибка при закрытии сессий: {e}")
+async def main_async():
+    """Основная асинхронная функция запуска бота"""
+    try:
+        TOKEN = os.getenv('TELEGRAM_TOKEN')
+        if not TOKEN:
+            raise ValueError("Токен не найден!")
+
+        await terminate_previous_sessions(TOKEN)
+        
+        application = Application.builder().token(TOKEN).build()
+        
+    # Обработчик старта и подключения таблицы
+        start_conv_handler = ConversationHandler(
+            entry_points=[CommandHandler('start', start)],
+            states={
+                START: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_spreadsheet_url)],
+            },
+            fallbacks=[CommandHandler('cancel', cancel)],
+        )
+    
+        # Обработчик задач
+        task_conv_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(task_start, pattern='^task_start$'),
+            CallbackQueryHandler(task_end, pattern='^task_end$')
+        ],
+        states={
+            TASK_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_task_description)],
+            TASK_TAGS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_task_tags),
+                CallbackQueryHandler(confirm_end_task, pattern='^(confirm_end|cancel_end)$'),
+                CallbackQueryHandler(skip_tags, pattern='^skip_tags$')
+            ]
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+        )
+
+    # Регистрируем обработчики
+        application.add_handler(start_conv_handler)
+        application.add_handler(task_conv_handler)
+        application.add_handler(CommandHandler('taskend', end_task))
+        application.add_handler(CommandHandler('reportweek', report_week))
+        application.add_handler(CommandHandler('reportmonth', report_week))  # Временная заглушка
+        application.add_handler(CallbackQueryHandler(button_handler))
+        application.add_error_handler(error_handler)
+        
+        logger.info("Бот запускается...")
+        await application.run_polling(
+            drop_pending_updates=True,
+            close_loop=False
+        )
+    except telegram.error.Conflict as e:
+        logger.error(f"Конфликт: {e}. Возможно, уже запущен другой экземпляр бота.")
+    except Exception as e:
+        logger.error(f"Ошибка при запуске бота: {e}", exc_info=True)
 
 
 def main() -> None:
     try:
-        TOKEN = os.getenv('TELEGRAM_TOKEN')
-        if not TOKEN:
-            raise ValueError("Токен не найден! Проверьте переменные окружения.")
-        
-        asyncio.run(terminate_previous_sessions(TOKEN))
-        application = Application.builder().token(TOKEN).build()
-        
-        # Добавляем периодический пинг
-        job_queue = application.job_queue
-        if job_queue:
-            job_queue.run_repeating(
-                keep_alive_ping, 
-                interval=120,  # Каждые 2 минуты
-                first=10       # Первый пинг через 10 секунд после старта
-            )
-            logger.info("Keep-alive ping job scheduled")
-        else:
-            logger.warning("Job queue not available")
-            
+        asyncio.run(main_async())
+    except KeyboardInterrupt:
+        logger.info("Бот остановлен пользователем")
     except Exception as e:
-        logger.error(f"Failed to start bot: {e}", exc_info=True)
-        raise
+        logger.error(f"Критическая ошибка: {e}", exc_info=True)
 
-    # Обработчик старта и подключения таблицы
-    start_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            START: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_spreadsheet_url)],
-        },
-        fallbacks=[CommandHandler('cancel', cancel)],
-    )
-
-    # Обработчик задач
-    task_conv_handler = ConversationHandler(
-    entry_points=[
-        CallbackQueryHandler(task_start, pattern='^task_start$'),
-        CallbackQueryHandler(task_end, pattern='^task_end$')
-    ],
-    states={
-        TASK_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_task_description)],
-        TASK_TAGS: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_task_tags),
-            CallbackQueryHandler(confirm_end_task, pattern='^(confirm_end|cancel_end)$'),
-            CallbackQueryHandler(skip_tags, pattern='^skip_tags$')
-        ]
-    },
-    fallbacks=[CommandHandler('cancel', cancel)]
-    )
-
-    # Регистрируем обработчики
-    application.add_handler(start_conv_handler)
-    application.add_handler(task_conv_handler)
-    application.add_handler(CommandHandler('taskend', end_task))
-    application.add_handler(CommandHandler('reportweek', report_week))
-    application.add_handler(CommandHandler('reportmonth', report_week))  # Временная заглушка
-    application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_error_handler(error_handler)
-
-    logger.info("Бот запускается...")
-    application.run_polling()
 
 if __name__ == '__main__':
     main()
