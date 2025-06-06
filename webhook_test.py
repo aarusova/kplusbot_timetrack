@@ -561,32 +561,75 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-def run_health_server():
+def run_health_server(port=10000):
     """Запуск HTTP-сервера для health-check"""
-    server = HTTPServer(('0.0.0.0', 10000), HealthHandler)
+    server = HTTPServer(('0.0.0.0', port), HealthHandler)
+    logger.info(f"Health check server running on port {port}")
     server.serve_forever()
 
-async def polling_with_reconnect(application):
-    """Polling с автоматическим переподключением"""
+async def polling_task(application):
+    """Задача для running polling с обработкой ошибок"""
     while True:
         try:
+            logger.info("Starting polling...")
             await application.run_polling()
         except Exception as e:
-            logger.error(f"Ошибка polling: {e}. Переподключение через 10 секунд...")
+            logger.error(f"Polling error: {e}. Reconnecting in 10 seconds...")
             await asyncio.sleep(10)
 
-async def wakeup_ping():
-    """Периодический пинг для предотвращения сна"""
+async def wakeup_ping(port=10000):
+    """Периодический самопинг для предотвращения сна"""
+    import http.client
     while True:
         try:
-            # Простое HTTP-запрос к самому себе
-            async with aiohttp.ClientSession() as session:
-                async with session.get('http://localhost:10000/health') as resp:
-                    if resp.status == 200:
-                        logger.debug("Ping успешен")
+            conn = http.client.HTTPConnection("localhost", port, timeout=5)
+            conn.request("GET", "/health")
+            res = conn.getresponse()
+            if res.status == 200:
+                logger.debug("Ping successful")
+            else:
+                logger.warning(f"Ping failed with status {res.status}")
+            conn.close()
         except Exception as e:
-            logger.warning(f"Ping не удался: {e}")
-        await asyncio.sleep(120)
+            logger.warning(f"Ping error: {e}")
+        await asyncio.sleep(300)  # Пинг каждые 5 минут
+
+async def main_async():
+    """Основная асинхронная функция"""
+    IS_RENDER = os.getenv('RENDER', 'false').lower() == 'true'
+    PORT = int(os.getenv('PORT', 10000))
+
+    # Инициализация бота
+    application = Application.builder().token(os.getenv('TELEGRAM_TOKEN')).build()
+    
+    # Здесь добавьте ваши обработчики команд
+    # application.add_handler(...)
+
+    if IS_RENDER:
+        logger.info("Running in Render.com mode with auto-reconnect")
+        
+        # Запуск health-check сервера в отдельном потоке
+        health_thread = Thread(target=run_health_server, args=(PORT,), daemon=True)
+        health_thread.start()
+
+        # Создаем и запускаем задачи
+        tasks = [
+            asyncio.create_task(polling_task(application)),
+            asyncio.create_task(wakeup_ping(PORT))
+        ]
+
+        try:
+            await asyncio.gather(*tasks)
+        except asyncio.CancelledError:
+            logger.info("Application shutdown requested")
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+        finally:
+            logger.info("Cleaning up...")
+    else:
+        logger.info("Running in standard polling mode")
+        await application.run_polling()
+
 
 
 
@@ -670,31 +713,13 @@ def main() -> None:
     IS_RENDER = os.getenv('RENDER', 'false').lower() == 'true'
     PORT = int(os.getenv('PORT', 10000))
 
-    health_thread = Thread(target=run_health_server, daemon=True)
-    health_thread.start()
+    try:
+        asyncio.run(main_async())
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
     
-    if IS_RENDER:
-        logger.info("Запуск бота в режиме Polling на Render с переподключением")
-        
-        # Создаем asyncio loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        # Запускаем задачи
-        tasks = [
-            loop.create_task(polling_with_reconnect(application)),
-            loop.create_task(wakeup_ping())
-        ]
-        
-        try:
-            loop.run_forever()
-        except KeyboardInterrupt:
-            pass
-        finally:
-            loop.close()
-    else:
-        logger.info("Запуск бота в стандартном режиме Polling")
-        application.run_polling()
     
 if __name__ == '__main__':
     main()
