@@ -554,7 +554,8 @@ def main() -> None:
         TOKEN = os.getenv('TELEGRAM_TOKEN')
         if not TOKEN:
             raise ValueError("Токен не найден! Проверьте переменные окружения.")
-
+        
+        asyncio.run(terminate_previous_sessions(TOKEN))
         application = Application.builder().token(TOKEN).build()
         
         # Добавляем периодический пинг
@@ -607,8 +608,6 @@ def main() -> None:
     application.add_handler(CommandHandler('reportmonth', report_week))  # Временная заглушка
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_error_handler(error_handler)
-
-    await terminate_previous_sessions()
 
     logger.info("Бот запускается...")
     application.run_polling()
