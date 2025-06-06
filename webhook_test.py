@@ -17,7 +17,14 @@ from telegram.ext import (
 import json
 from tempfile import NamedTemporaryFile
 
+import asyncio
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
+from datetime import datetime, timedelta
+import pytz
 
+
+TIMEZONE = pytz.timezone('Europe/Moscow')
     
 # Настройка логирования
 logging.basicConfig(
@@ -542,6 +549,47 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
                 "⚠️ Произошла ошибка. Напиши Насте."
             )
 
+
+class HealthHandler(BaseHTTPRequestHandler):
+    """Обработчик health-check запросов"""
+    def do_GET(self):
+        if self.path == '/health':
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'OK')
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+def run_health_server():
+    """Запуск HTTP-сервера для health-check"""
+    server = HTTPServer(('0.0.0.0', 10000), HealthHandler)
+    server.serve_forever()
+
+async def polling_with_reconnect(application):
+    """Polling с автоматическим переподключением"""
+    while True:
+        try:
+            await application.run_polling()
+        except Exception as e:
+            logger.error(f"Ошибка polling: {e}. Переподключение через 10 секунд...")
+            await asyncio.sleep(10)
+
+async def wakeup_ping():
+    """Периодический пинг для предотвращения сна"""
+    while True:
+        try:
+            # Простое HTTP-запрос к самому себе
+            async with aiohttp.ClientSession() as session:
+                async with session.get('http://localhost:10000/health') as resp:
+                    if resp.status == 200:
+                        logger.debug("Ping успешен")
+        except Exception as e:
+            logger.warning(f"Ping не удался: {e}")
+        await asyncio.sleep(120)
+
+
+
 def main() -> None:
     try:
         TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -553,7 +601,7 @@ def main() -> None:
     except Exception as e:
         logger.error(f"Failed to start bot: {e}", exc_info=True)
         raise
-
+    
     # Обработчик старта и подключения таблицы
     start_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
@@ -622,22 +670,31 @@ def main() -> None:
     IS_RENDER = os.getenv('RENDER', 'false').lower() == 'true'
     PORT = int(os.getenv('PORT', 10000))
 
+    health_thread = Thread(target=run_health_server, daemon=True)
+    health_thread.start()
+    
     if IS_RENDER:
-        # Health check сервер
-        from http.server import BaseHTTPRequestHandler, HTTPServer
-        from threading import Thread
+        logger.info("Запуск бота в режиме Polling на Render с переподключением")
         
-        class HealthHandler(BaseHTTPRequestHandler):
-            def do_GET(self):
-                self.send_response(200)
-                self.end_headers()
-                self.wfile.write(b'OK')
+        # Создаем asyncio loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
-        server = HTTPServer(('0.0.0.0', PORT), HealthHandler)
-        Thread(target=server.serve_forever, daemon=True).start()
-
-    # Всегда используем polling на Render
-    application.run_polling()
+        # Запускаем задачи
+        tasks = [
+            loop.create_task(polling_with_reconnect(application)),
+            loop.create_task(wakeup_ping())
+        ]
+        
+        try:
+            loop.run_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            loop.close()
+    else:
+        logger.info("Запуск бота в стандартном режиме Polling")
+        application.run_polling()
     
 if __name__ == '__main__':
     main()
