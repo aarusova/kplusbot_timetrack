@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -542,10 +542,17 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
                 "⚠️ Произошла ошибка. Напиши Насте."
             )
 
-async def terminate_previous_sessions():
-    bot = Bot(TOKEN)
+async def terminate_previous_sessions(token: str):
+    """Закрываем предыдущие сессии бота"""
     try:
-        await bot.close()  # Закрываем предыдущие соединения
+        async with Bot(token) as bot:
+            # Получаем информацию о боте, чтобы проверить подключение
+            me = await bot.get_me()
+            logger.info(f"Подключение к боту @{me.username} успешно")
+            
+            # Закрываем все предыдущие соединения
+            await bot.close()
+            logger.info("Предыдущие сессии закрыты")
     except Exception as e:
         logger.warning(f"Ошибка при закрытии сессий: {e}")
         
