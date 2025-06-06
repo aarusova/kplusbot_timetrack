@@ -17,7 +17,13 @@ from telegram.ext import (
 import json
 from tempfile import NamedTemporaryFile
 
+from flask import Flask
+app = Flask(__name__)
 
+@app.route('/ping')
+def ping():
+    return "OK", 200
+    
 # Настройка логирования
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -589,8 +595,10 @@ def main() -> None:
     application.add_error_handler(error_handler)
 
 # Определяем режим работы
-    IS_RENDER = os.getenv('RENDER', 'false').lower() == 'true'
-
+    '''IS_RENDER = os.getenv('RENDER', 'false').lower() == 'true'
+    if IS_RENDER:
+        Thread(target=lambda: app.run(host='0.0.0.0', port=5000)).start()
+    
     if IS_RENDER:
         WEBHOOK_URL = os.getenv('WEBHOOK_URL')
         WEBHOOK_PATH = '/webhook'
@@ -613,9 +621,28 @@ def main() -> None:
     else:
         logger.info("ошибка вебхука...")
         #application.run_polling()
-  
-    '''logger.info("Бот запускается...")
-    application.run_polling()
+
     '''
+   
+    IS_RENDER = os.getenv('RENDER', 'false').lower() == 'true'
+    PORT = int(os.getenv('PORT', 10000))
+
+    if IS_RENDER:
+        # Health check сервер
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        from threading import Thread
+        
+        class HealthHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'OK')
+        
+        server = HTTPServer(('0.0.0.0', PORT), HealthHandler)
+        Thread(target=server.serve_forever, daemon=True).start()
+
+    # Всегда используем polling на Render
+    application.run_polling()
+    
 if __name__ == '__main__':
     main()
