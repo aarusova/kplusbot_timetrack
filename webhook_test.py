@@ -589,28 +589,26 @@ def main() -> None:
     application.add_error_handler(error_handler)
 
 # Определяем режим работы
-    WEBHOOK_MODE = os.getenv('RENDER', 'false').lower() == 'true'  # Render автоматически устанавливает RENDER=true
-    
-    if WEBHOOK_MODE:
-        # Настройки для Webhook на Render
+    IS_RENDER = os.getenv('RENDER', 'false').lower() == 'true'
+
+    if IS_RENDER:
         WEBHOOK_URL = os.getenv('WEBHOOK_URL')
         WEBHOOK_PATH = '/webhook'
-        PORT = int(os.getenv('PORT', 10000))  # Render использует порт из переменной PORT
         
         logger.info("Запуск бота в режиме Webhook на Render...")
         
-        async def post_init(app: Application) -> None:
-            await app.bot.set_webhook(
+        async def post_init():
+            await application.bot.set_webhook(
                 url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
                 drop_pending_updates=True
             )
-
+        
+        # Запускаем webhook с указанием порта
         application.run_webhook(
             listen="0.0.0.0",
-            port=PORT,
+            port=int(os.getenv('PORT', 10000)),
             webhook_url=WEBHOOK_URL,
-            drop_pending_updates=True,
-            on_startup=post_init
+            secret_token=os.getenv('WEBHOOK_SECRET')
         )
     else:
         logger.info("ошибка вебхука...")
