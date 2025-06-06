@@ -17,7 +17,7 @@ from telegram.ext import (
 )
 import json
 from tempfile import NamedTemporaryFile
-
+from telegram.error import Conflict
 
 # Настройка логирования
 logging.basicConfig(
@@ -548,6 +548,7 @@ async def terminate_previous_sessions():
         await bot.close()  # Закрываем предыдущие соединения
     except Exception as e:
         logger.warning(f"Ошибка при закрытии сессий: {e}")
+        
 async def main_async():
     """Основная асинхронная функция запуска бота"""
     try:
@@ -599,7 +600,7 @@ async def main_async():
             drop_pending_updates=True,
             close_loop=False
         )
-    except telegram.error.Conflict as e:
+    except Conflict as e:
         logger.error(f"Конфликт: {e}. Возможно, уже запущен другой экземпляр бота.")
     except Exception as e:
         logger.error(f"Ошибка при запуске бота: {e}", exc_info=True)
