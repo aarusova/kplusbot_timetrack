@@ -541,6 +541,14 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
                 "⚠️ Произошла ошибка. Напиши Насте."
             )
 
+async def terminate_previous_sessions():
+    bot = Bot(TOKEN)
+    try:
+        await bot.close()  # Закрываем предыдущие соединения
+    except Exception as e:
+        logger.warning(f"Ошибка при закрытии сессий: {e}")
+
+
 def main() -> None:
     try:
         TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -599,6 +607,8 @@ def main() -> None:
     application.add_handler(CommandHandler('reportmonth', report_week))  # Временная заглушка
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_error_handler(error_handler)
+
+    await terminate_previous_sessions()
 
     logger.info("Бот запускается...")
     application.run_polling()
