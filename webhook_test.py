@@ -17,15 +17,7 @@ from telegram.ext import (
 import json
 from tempfile import NamedTemporaryFile
 
-import asyncio
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from threading import Thread
-from datetime import datetime, timedelta
-import pytz
 
-
-TIMEZONE = pytz.timezone('Europe/Moscow')
-    
 # Настройка логирования
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -549,107 +541,6 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
                 "⚠️ Произошла ошибка. Напиши Насте."
             )
 
-
-class HealthHandler(BaseHTTPRequestHandler):
-    """Обработчик health-check запросов"""
-    def do_GET(self):
-        if self.path == '/health':
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b'OK')
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-def run_health_server(port=10000):
-    """Запуск HTTP-сервера для health-check"""
-    server = HTTPServer(('0.0.0.0', port), HealthHandler)
-    logger.info(f"Health check server running on port {port}")
-    server.serve_forever()
-
-async def run_polling(application):
-    """Запуск polling с обработкой ошибок"""
-    try:
-        await application.initialize()
-        await application.start()
-        await application.updater.start_polling()
-        
-        while True:
-            await asyncio.sleep(3600)  # Просто ждем
-            
-    except asyncio.CancelledError:
-        logger.info("Polling task cancelled")
-    except Exception as e:
-        logger.error(f"Polling error: {e}")
-    finally:
-        await application.updater.stop()
-        await application.stop()
-        await application.shutdown()
-
-async def wakeup_ping(port=10000):
-    """Периодический самопинг для предотвращения сна"""
-    import http.client
-    while True:
-        try:
-            conn = http.client.HTTPConnection("localhost", port, timeout=5)
-            conn.request("GET", "/health")
-            res = conn.getresponse()
-            if res.status == 200:
-                logger.debug("Ping successful")
-            else:
-                logger.warning(f"Ping failed with status {res.status}")
-            conn.close()
-        except Exception as e:
-            logger.warning(f"Ping error: {e}")
-        await asyncio.sleep(300)  # Пинг каждые 5 минут
-
-async def main_async():
-    """Основная асинхронная функция"""
-    IS_RENDER = os.getenv('RENDER', 'false').lower() == 'true'
-    PORT = int(os.getenv('PORT', 10000))
-
-    # Инициализация бота
-    application = Application.builder().token(os.getenv('TELEGRAM_TOKEN')).build()
-    
-    # Здесь добавьте ваши обработчики команд
-    # application.add_handler(...)
-
-    if IS_RENDER:
-        logger.info("Running in Render.com mode with auto-reconnect")
-        
-        # Запуск health-check сервера в отдельном потоке
-        health_thread = Thread(target=run_health_server, args=(PORT,), daemon=True)
-        health_thread.start()
-
-        # Создаем и запускаем задачи
-        polling_task = asyncio.create_task(run_polling(application))
-        ping_task = asyncio.create_task(wakeup_ping(PORT))
-
-        try:
-            await asyncio.gather(polling_task, ping_task)
-        except asyncio.CancelledError:
-            logger.info("Application shutdown requested")
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-        finally:
-            if not polling_task.done():
-                polling_task.cancel()
-            if not ping_task.done():
-                ping_task.cancel()
-            
-            await asyncio.gather(
-                polling_task,
-                ping_task,
-                return_exceptions=True
-            )
-            
-            logger.info("Clean shutdown completed")
-    else:
-        logger.info("Running in standard polling mode")
-        await application.run_polling()
-
-
-
 def main() -> None:
     try:
         TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -657,11 +548,23 @@ def main() -> None:
             raise ValueError("Токен не найден! Проверьте переменные окружения.")
 
         application = Application.builder().token(TOKEN).build()
-        # остальной код
+        
+        # Добавляем периодический пинг
+        job_queue = application.job_queue
+        if job_queue:
+            job_queue.run_repeating(
+                keep_alive_ping, 
+                interval=120,  # Каждые 2 минуты
+                first=10       # Первый пинг через 10 секунд после старта
+            )
+            logger.info("Keep-alive ping job scheduled")
+        else:
+            logger.warning("Job queue not available")
+            
     except Exception as e:
         logger.error(f"Failed to start bot: {e}", exc_info=True)
         raise
-    
+
     # Обработчик старта и подключения таблицы
     start_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
@@ -686,7 +589,7 @@ def main() -> None:
         ]
     },
     fallbacks=[CommandHandler('cancel', cancel)]
-)
+    )
 
     # Регистрируем обработчики
     application.add_handler(start_conv_handler)
@@ -697,46 +600,8 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_error_handler(error_handler)
 
-# Определяем режим работы
-    '''IS_RENDER = os.getenv('RENDER', 'false').lower() == 'true'
-    if IS_RENDER:
-        Thread(target=lambda: app.run(host='0.0.0.0', port=5000)).start()
-    
-    if IS_RENDER:
-        WEBHOOK_URL = os.getenv('WEBHOOK_URL')
-        WEBHOOK_PATH = '/webhook'
-        
-        logger.info("Запуск бота в режиме Webhook на Render...")
-        
-        async def post_init():
-            await application.bot.set_webhook(
-                url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
-                drop_pending_updates=True
-            )
-        
-        # Запускаем webhook с указанием порта
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=int(os.getenv('PORT', 10000)),
-            webhook_url=WEBHOOK_URL,
-            secret_token=os.getenv('WEBHOOK_SECRET')
-        )
-    else:
-        logger.info("ошибка вебхука...")
-        #application.run_polling()
+    logger.info("Бот запускается...")
+    application.run_polling()
 
-    '''
-   
-    IS_RENDER = os.getenv('RENDER', 'false').lower() == 'true'
-    PORT = int(os.getenv('PORT', 10000))
-
-    try:
-        asyncio.run(main_async())
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
-    except Exception as e:
-        logger.error(f"Fatal error: {e}")
-    
-    
 if __name__ == '__main__':
     main()
